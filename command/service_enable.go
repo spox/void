@@ -38,7 +38,7 @@ func (c *ServiceEnableCommand) Run(args []string) int {
 		c.UI.Info(fmt.Sprintf(
 			"Enabled service: %s", c.ServiceName))
 	}
-	if _, ok := cOpts["start"]; ok && !c.ServiceIsRunning() {
+	if cOpts.Get("start") != nil && !c.ServiceIsRunning() {
 		c.UI.Warn(fmt.Sprintf(
 			"Starting service `%s`...", c.ServiceName))
 		if c.StartService() {

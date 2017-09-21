@@ -19,16 +19,17 @@ type ServiceCommand struct {
 	ServiceName string
 }
 
-func (c *ServiceCommand) Commands(ui cli.Ui, debug bool) map[string]cli.CommandFactory {
+func (c *ServiceCommand) Commands(appName string, ui cli.Ui, debug bool) map[string]cli.CommandFactory {
 	return map[string]cli.CommandFactory{
 		"service disable": func() (cli.Command, error) {
 			return &ServiceDisableCommand{
 				ServiceCommand: ServiceCommand{
 					CoreCommand: CoreCommand{
 						Debug:        debug,
-						HelpText:     "Disable service and stop if running",
-						SynopsisText: "Disable service",
+						HelpText:     "void service disable NAME",
+						SynopsisText: "Disable a system service",
 						UI:           ui,
+						AppName:      appName,
 					},
 				},
 			}, nil
@@ -38,9 +39,15 @@ func (c *ServiceCommand) Commands(ui cli.Ui, debug bool) map[string]cli.CommandF
 				ServiceCommand: ServiceCommand{
 					CoreCommand: CoreCommand{
 						Debug:        debug,
-						HelpText:     "Enable, and optionally start, a service\n  void service enable NAME [-start]",
-						SynopsisText: "Enable service",
-						UI:           ui,
+						HelpText:     "void service enable NAME",
+						SynopsisText: "Enable a system service",
+						Flags: []CoreFlag{
+							CoreFlag{
+								Name:        "start",
+								Boolean:     true,
+								Description: "Start service after enabling"}},
+						UI:      ui,
+						AppName: appName,
 					},
 				},
 			}, nil
@@ -50,9 +57,20 @@ func (c *ServiceCommand) Commands(ui cli.Ui, debug bool) map[string]cli.CommandF
 				ServiceCommand: ServiceCommand{
 					CoreCommand: CoreCommand{
 						Debug:        debug,
-						HelpText:     "List all services (or filtered)\n  void service list [-enabled] [-disabled]",
+						HelpText:     "void service list",
 						SynopsisText: "List services",
-						UI:           ui,
+						Flags: []CoreFlag{
+							CoreFlag{
+								Name:        "enabled",
+								Boolean:     true,
+								Description: "Display enabled services"},
+							CoreFlag{
+								Name:        "disabled",
+								Boolean:     true,
+								Description: "Display disabled services"}},
+
+						UI:      ui,
+						AppName: appName,
 					},
 				},
 			}, nil
@@ -62,9 +80,10 @@ func (c *ServiceCommand) Commands(ui cli.Ui, debug bool) map[string]cli.CommandF
 				ServiceCommand: ServiceCommand{
 					CoreCommand: CoreCommand{
 						Debug:        debug,
-						HelpText:     "Display status of all or given services\n  void service status [NAME, NAME,...]",
-						SynopsisText: "Status of services",
+						HelpText:     "void service status [NAME,...]",
+						SynopsisText: "Display status of services (all by default)",
 						UI:           ui,
+						AppName:      appName,
 					},
 				},
 			}, nil
@@ -72,13 +91,16 @@ func (c *ServiceCommand) Commands(ui cli.Ui, debug bool) map[string]cli.CommandF
 	}
 }
 
-func (c *ServiceCommand) Init(args []string, serviceName bool) (map[string][]string, error) {
-	fmtOpts := c.Parse(args)
+func (c *ServiceCommand) Init(args []string, serviceName bool) (ParsedCli, error) {
+	fmtOpts, err := c.Parse(args)
+	if err != nil {
+		return fmtOpts, err
+	}
 	if serviceName {
-		if _, ok := fmtOpts["_args_"]; !ok || len(fmtOpts["_args_"]) != 1 {
+		if len(fmtOpts.Args) != 1 {
 			return fmtOpts, errors.New("Single service name required!")
 		} else {
-			c.ServiceName = fmtOpts["_args_"][0]
+			c.ServiceName = fmtOpts.Args[0]
 		}
 	}
 	return fmtOpts, nil

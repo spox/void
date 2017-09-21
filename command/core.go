@@ -1,6 +1,7 @@
 package command
 
 import (
+	"errors"
 	"fmt"
 	"github.com/mitchellh/cli"
 	"os"
@@ -14,11 +15,59 @@ type CoreCommand struct {
 	HelpText     string
 	SynopsisText string
 	Debug        bool
+	Flags        []CoreFlag
 	UI           cli.Ui
+	AppName      string
+}
+
+type CoreFlag struct {
+	Description string
+	Default     string
+	Name        string
+	Value       string
+	Boolean     bool
+}
+
+type ParsedCli struct {
+	Flags map[string]CoreFlag
+	Args  []string
+}
+
+func (p *ParsedCli) Get(name string) *CoreFlag {
+	flag, ok := p.Flags[name]
+	if ok {
+		return &flag
+	}
+	return nil
+}
+
+func (c *CoreCommand) Flag(name string) (CoreFlag, error) {
+	var flag CoreFlag
+	for _, flag := range c.Flags {
+		if flag.Name == name {
+			return flag, nil
+		}
+	}
+	return flag, errors.New(fmt.Sprintf("Unknown flag `%s`", name))
 }
 
 func (c *CoreCommand) Help() string {
-	return c.HelpText
+	maxLen := 0
+	for _, flag := range c.Flags {
+		if len(flag.Name) > maxLen {
+			maxLen = len(flag.Name)
+		}
+	}
+	maxLen++
+	helpText := c.SynopsisText + "\n\nUsage: " + c.HelpText + "\n"
+	for _, flag := range c.Flags {
+		helpText = helpText + "    --" + flag.Name
+		for i := 0; i < (maxLen - len(flag.Name)); i++ {
+			helpText = helpText + " "
+		}
+		helpText = helpText + flag.Description + "\n"
+	}
+	return helpText
 }
 
 func (c *CoreCommand) Synopsis() string {
@@ -29,34 +78,60 @@ func (c *CoreCommand) Run(args []string) int {
 	return 0
 }
 
-func Commands(ui cli.Ui, debug bool) map[string]cli.CommandFactory {
-	return (&ServiceCommand{}).Commands(ui, debug)
+func Commands(appName string, ui cli.Ui, debug bool) map[string]cli.CommandFactory {
+	cmds := (&ServiceCommand{}).Commands(appName, ui, debug)
+	for k, v := range (&GopherCommand{}).Commands(appName, ui, debug) {
+		cmds[k] = v
+	}
+	return cmds
 }
 
 // Extremely simple and dumb command line argument parser
-func (c *CoreCommand) Parse(args []string) map[string][]string {
-	fmtOpts := map[string][]string{}
-	fmtOpts["_args_"] = []string{}
+func (c *CoreCommand) Parse(args []string) (ParsedCli, error) {
+	parsed := ParsedCli{
+		Args:  []string{},
+		Flags: map[string]CoreFlag{}}
+	var lastItem CoreFlag
+	setLast := false
 	for _, argItem := range args {
-		if strings.Index(argItem, "-") == 0 {
-			optVal := ""
-			if strings.Contains(argItem, "=") {
-				argParts := strings.SplitN(argItem, "=", 2)
-				argItem = argParts[0]
-				optVal = argParts[1]
+		if !setLast {
+			if strings.HasPrefix(argItem, "--") {
+				argItem = strings.Replace(argItem, "--", "", 1)
+			} else if strings.HasPrefix(argItem, "-") {
+				argItem = strings.Replace(argItem, "-", "", 1)
+			} else {
+				parsed.Args = append(parsed.Args, argItem)
+				continue
 			}
-			optKey := strings.Replace(argItem, "-", "", 1)
-			if _, ok := fmtOpts[optKey]; !ok {
-				fmtOpts[optKey] = []string{}
+			argParts := strings.SplitN(argItem, "=", 2)
+			flag, err := c.Flag(string(argParts[0]))
+			if err != nil {
+				return parsed, err
 			}
-			if optVal != "" {
-				fmtOpts[optKey] = append(fmtOpts[optKey], optVal)
+			if !flag.Boolean {
+				if len(argParts) == 2 {
+					flag.Value = string(argParts[1])
+				} else {
+					setLast = true
+					lastItem = flag
+				}
 			}
+			parsed.Flags[flag.Name] = flag
 		} else {
-			fmtOpts["_args_"] = append(fmtOpts["_args_"], argItem)
+			lastItem.Value = argItem
+			setLast = false
 		}
 	}
-	return fmtOpts
+	// Set any default flags that are unset
+	for _, defFlag := range c.Flags {
+		if _, ok := parsed.Flags[defFlag.Name]; !ok {
+			if defFlag.Default != "" {
+				defFlag.Value = defFlag.Default
+				parsed.Flags[defFlag.Name] = defFlag
+			}
+		}
+	}
+	return parsed, nil
 }
 
 // Runs the given command and returns the exit code. Includes
@@ -102,7 +177,7 @@ func (c *CoreCommand) isRoot() bool {
 
 func (c *CoreCommand) debug(line string) {
 	if c.Debug {
-		c.UI.Info(fmt.Sprintf(
+		c.UI.Output(fmt.Sprintf(
 			"[DEBUG] %s", line))
 	}
 }

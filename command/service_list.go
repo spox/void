@@ -21,7 +21,7 @@ func (c *ServiceListCommand) Run(args []string) int {
 			"Failed to list enabled services: %s", err))
 		return exitCode
 	}
-	if _, ok := cOpts["enabled"]; ok {
+	if cOpts.Get("enabled") != nil {
 		for _, v := range eSrv {
 			c.UI.Info(v)
 		}
@@ -34,11 +34,11 @@ func (c *ServiceListCommand) Run(args []string) int {
 		}
 		for _, v := range allSrv {
 			if c.contains(eSrv, v) {
-				if _, ok := cOpts["disabled"]; !ok {
+				if cOpts.Get("disabled") == nil {
 					c.UI.Info(v)
 				}
 			} else {
-				if _, ok := cOpts["enabled"]; !ok {
+				if cOpts.Get("enabled") == nil {
 					c.UI.Error(v)
 				}
 			}

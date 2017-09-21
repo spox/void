@@ -8,6 +8,7 @@ import (
 )
 
 const VERSION = "0.1.0"
+const APP_NAME = "void"
 
 // Available commands
 var Commands map[string]cli.CommandFactory
@@ -32,12 +33,12 @@ func realMain() int {
 		debug = true
 	}
 
-	commands := command.Commands(ui, debug)
+	commands := command.Commands(APP_NAME, ui, debug)
 
 	c := &cli.CLI{
 		Args:     os.Args[1:],
 		Commands: commands,
-		Name:     "void",
+		Name:     APP_NAME,
 		Version:  VERSION,
 	}
 

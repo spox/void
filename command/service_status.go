@@ -22,8 +22,8 @@ func (c *ServiceStatusCommand) Run(args []string) int {
 		return exitCode
 	}
 	srvs := []string{}
-	if len(cOpts["_args_"]) > 0 {
-		srvs = cOpts["_args_"]
+	if len(cOpts.Args) > 0 {
+		srvs = cOpts.Args
 	} else {
 		srvs = eSrv
 	}
