@@ -7,7 +7,7 @@ import (
 	"os"
 )
 
-const VERSION = "0.1.0"
+const VERSION = "0.1.2"
 const APP_NAME = "void"
 
 // Available commands
